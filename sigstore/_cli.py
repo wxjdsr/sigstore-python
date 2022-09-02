@@ -253,12 +253,43 @@ def main() -> None:
     # error handling later.
     args._parser = parser
 
+    _update_trust_root()
+
     if args.subcommand == "sign":
         _sign(args)
     elif args.subcommand == "verify":
         _verify(args)
     else:
         parser.error(f"Unknown subcommand: {args.subcommand}")
+
+
+def _update_trust_root() -> None:
+    # Here we ensure the Sigstore root certificates are up-to-date
+    # TODO: OS independent paths with Pathlib
+    tuf_cache = os.path.expanduser("~/.sigstore/root")
+    metadata_dir = tuf_cache + "/metadata"
+    targets_dir = tuf_cache + "/targets"
+    REPO_URL = ""
+
+    if not os.path.exists(metadata_dir + "/root.json"):
+        os.makedirs(tuf_cache, 0700, True)
+        os.makedirs(metadata_dir, 0700, True)
+        os.makedirs(targets_dir, 0700, True)
+        # Ensure the bundled copy of the root json is not tampered with
+        expected_root_hash = ""
+        print(f"Trusted root metadata does not match expected file digest!", file=sys.stderr)
+        # First: copy the trusted root and existing targets from the store to the common place in ~, if it doesn't exist
+        shutil.copy2(src, metadata_dir + "/root.json")
+        # Second: sanity/validity test of the contents of ~, drop to First if the check fails
+
+    # Third: check whether we should update - based on settings and expiration of root
+    # Fourth: now we're TUFfing
+    updater = Updater(
+        metadata_dir=metadata_dir,
+        metadata_base_url=f"{REPO_URL}/metadata/",
+        target_base_url=f"{REPO_URL}/targets/",
+        target_dir=targets_dir)
+    updater.refresh()
 
 
 def _sign(args: argparse.Namespace) -> None:
