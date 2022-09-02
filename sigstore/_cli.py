@@ -13,13 +13,17 @@
 # limitations under the License.
 
 import argparse
+import hashlib
 import logging
 import os
+import shutil
 import sys
 from importlib import resources
 from pathlib import Path
 from textwrap import dedent
 from typing import TextIO, cast
+
+from tuf.ngclient import Updater
 
 from sigstore import __version__
 from sigstore._internal.fulcio.client import DEFAULT_FULCIO_URL, FulcioClient
@@ -264,32 +268,76 @@ def main() -> None:
 
 
 def _update_trust_root() -> None:
-    # Here we ensure the Sigstore root certificates are up-to-date
-    # TODO: OS independent paths with Pathlib
-    tuf_cache = os.path.expanduser("~/.sigstore/root")
-    metadata_dir = tuf_cache + "/metadata"
-    targets_dir = tuf_cache + "/targets"
-    REPO_URL = ""
+    # TODO: this may deserve it's own class to encapsulate all of the constants
+    # Updater.__init__() does the paving, by calling a separate function (below)
+    #   TUF_DIR -> cache_dir, REPO_URL, and EXPECTED_ROOT_DIGEST are args
+    # Updater.prepare_local_cache() will create and populate the local directories
+    # Updater.check_local_cache() will ensure the metadata directory is sane
+    # Updater.update() retrieves new metadata and targets
+    TUF_DIR = Path.home() / ".sigstore" / "root"
+    METADATA_DIR = TUF_DIR / "metadata"
+    TARGETS_DIR = TUF_DIR / "targets"
+    EXPECTED_ROOT_DIGEST = (
+        "8e34a5c236300b92d0833b205f814d4d7206707fc870d3ff6dcf49f10e56ca0a"
+    )
+    REPO_URL = "https://storage.googleapis.com/sigstore-tuf-root/"
+    SIGSTORE_TARGETS = [
+        "ctfe.pub",
+        "ctfe.staging.pub",
+        "fulcio_intermediate.crt.pem",
+        "fulcio_intermediate.crt.staging.pem",
+        "fulcio.crt.pem",
+        "fulcio.crt.staging.pem",
+        "rekor.pub",
+        "rekor.staging.pub",
+    ]
 
-    if not os.path.exists(metadata_dir + "/root.json"):
-        os.makedirs(tuf_cache, 0700, True)
-        os.makedirs(metadata_dir, 0700, True)
-        os.makedirs(targets_dir, 0700, True)
+    # Pave the TUF client directory, if required
+    tuf_root = METADATA_DIR / "root.json"
+    if not tuf_root.exists():
+        TUF_DIR.mkdir(mode=0o0700, parents=True, exist_ok=True)
+        METADATA_DIR.mkdir(mode=0o0700, parents=True, exist_ok=True)
+        TARGETS_DIR.mkdir(mode=0o0700, parents=True, exist_ok=True)
+
         # Ensure the bundled copy of the root json is not tampered with
-        expected_root_hash = ""
-        print(f"Trusted root metadata does not match expected file digest!", file=sys.stderr)
-        # First: copy the trusted root and existing targets from the store to the common place in ~, if it doesn't exist
-        shutil.copy2(src, metadata_dir + "/root.json")
-        # Second: sanity/validity test of the contents of ~, drop to First if the check fails
+        # NOTE: this check requires us to update EXPECTED_ROOT_DIGEST each time
+        # we bundle a newer root.json
+        bootstrap_root = resources.read_binary("sigstore._store", "root.json")
+        bootstrap_root_digest = hashlib.sha256(bootstrap_root).hexdigest()
+        if not bootstrap_root_digest == EXPECTED_ROOT_DIGEST:
+            print(
+                "Trusted root metadata does not match expected file digest!",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
-    # Third: check whether we should update - based on settings and expiration of root
-    # Fourth: now we're TUFfing
+        # Copy the trusted root and existing targets from the store
+        with resources.path("sigstore._store", "root.json") as res:
+            shutil.copy2(res, METADATA_DIR)
+        for target in SIGSTORE_TARGETS:
+            with resources.path("sigstore._store", target) as res:
+                shutil.copy2(res, TARGETS_DIR)
+
+    # TODO: Sanity check the cache, we could then pave if the check fails
+    # once the paving logic above is a separate function
+
     updater = Updater(
-        metadata_dir=metadata_dir,
-        metadata_base_url=f"{REPO_URL}/metadata/",
+        metadata_dir=str(METADATA_DIR),
+        metadata_base_url=f"{REPO_URL}",
         target_base_url=f"{REPO_URL}/targets/",
-        target_dir=targets_dir)
+        target_dir=str(TARGETS_DIR),
+    )
+    # TODO: Check whether we should update based on settings and expiration of root
+    # Fetch the latest version of all of the Sigstore certificates
     updater.refresh()
+    for target in SIGSTORE_TARGETS:
+        target_info = updater.get_targetinfo(target)
+        if not target_info:
+            print(f"Failed to find update information about {target}", sys.stderr)
+            sys.exit(1)
+        cached_target = updater.find_cached_target(target_info)
+        if not cached_target:
+            updater.download_target(target_info)
 
 
 def _sign(args: argparse.Namespace) -> None:
@@ -344,6 +392,7 @@ def _sign(args: argparse.Namespace) -> None:
     elif args.fulcio_url == DEFAULT_FULCIO_URL and args.rekor_url == DEFAULT_REKOR_URL:
         signer = Signer.production()
     else:
+        # TODO: must use cached copy in TARGETS_DIR
         signer = Signer(
             fulcio=FulcioClient(args.fulcio_url),
             rekor=RekorClient(
