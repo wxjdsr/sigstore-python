@@ -13,17 +13,13 @@
 # limitations under the License.
 
 import argparse
-import hashlib
 import logging
 import os
-import shutil
 import sys
 from importlib import resources
 from pathlib import Path
 from textwrap import dedent
 from typing import TextIO, cast
-
-from tuf.ngclient import Updater
 
 from sigstore import __version__
 from sigstore._internal.fulcio.client import DEFAULT_FULCIO_URL, FulcioClient
@@ -39,6 +35,7 @@ from sigstore._internal.oidc.oauth import (
 )
 from sigstore._internal.rekor.client import DEFAULT_REKOR_URL, RekorClient
 from sigstore._sign import Signer
+from sigstore._trust_root import TrustUpdater
 from sigstore._verify import (
     CertificateVerificationFailure,
     VerificationFailure,
@@ -269,75 +266,8 @@ def main() -> None:
 
 def _update_trust_root() -> None:
     # TODO: this may deserve it's own class to encapsulate all of the constants
-    # Updater.__init__() does the paving, by calling a separate function (below)
-    #   TUF_DIR -> cache_dir, REPO_URL, and EXPECTED_ROOT_DIGEST are args
-    # Updater.prepare_local_cache() will create and populate the local directories
-    # Updater.check_local_cache() will ensure the metadata directory is sane
-    # Updater.update() retrieves new metadata and targets
-    TUF_DIR = Path.home() / ".sigstore" / "root"
-    METADATA_DIR = TUF_DIR / "metadata"
-    TARGETS_DIR = TUF_DIR / "targets"
-    EXPECTED_ROOT_DIGEST = (
-        "8e34a5c236300b92d0833b205f814d4d7206707fc870d3ff6dcf49f10e56ca0a"
-    )
-    REPO_URL = "https://storage.googleapis.com/sigstore-tuf-root/"
-    SIGSTORE_TARGETS = [
-        "ctfe.pub",
-        "ctfe.staging.pub",
-        "fulcio_intermediate.crt.pem",
-        "fulcio_intermediate.crt.staging.pem",
-        "fulcio.crt.pem",
-        "fulcio.crt.staging.pem",
-        "rekor.pub",
-        "rekor.staging.pub",
-    ]
-
-    # Pave the TUF client directory, if required
-    tuf_root = METADATA_DIR / "root.json"
-    if not tuf_root.exists():
-        TUF_DIR.mkdir(mode=0o0700, parents=True, exist_ok=True)
-        METADATA_DIR.mkdir(mode=0o0700, parents=True, exist_ok=True)
-        TARGETS_DIR.mkdir(mode=0o0700, parents=True, exist_ok=True)
-
-        # Ensure the bundled copy of the root json is not tampered with
-        # NOTE: this check requires us to update EXPECTED_ROOT_DIGEST each time
-        # we bundle a newer root.json
-        bootstrap_root = resources.read_binary("sigstore._store", "root.json")
-        bootstrap_root_digest = hashlib.sha256(bootstrap_root).hexdigest()
-        if not bootstrap_root_digest == EXPECTED_ROOT_DIGEST:
-            print(
-                "Trusted root metadata does not match expected file digest!",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-        # Copy the trusted root and existing targets from the store
-        with resources.path("sigstore._store", "root.json") as res:
-            shutil.copy2(res, METADATA_DIR)
-        for target in SIGSTORE_TARGETS:
-            with resources.path("sigstore._store", target) as res:
-                shutil.copy2(res, TARGETS_DIR)
-
-    # TODO: Sanity check the cache, we could then pave if the check fails
-    # once the paving logic above is a separate function
-
-    updater = Updater(
-        metadata_dir=str(METADATA_DIR),
-        metadata_base_url=f"{REPO_URL}",
-        target_base_url=f"{REPO_URL}/targets/",
-        target_dir=str(TARGETS_DIR),
-    )
-    # TODO: Check whether we should update based on settings and expiration of root
-    # Fetch the latest version of all of the Sigstore certificates
-    updater.refresh()
-    for target in SIGSTORE_TARGETS:
-        target_info = updater.get_targetinfo(target)
-        if not target_info:
-            print(f"Failed to find update information about {target}", sys.stderr)
-            sys.exit(1)
-        cached_target = updater.find_cached_target(target_info)
-        if not cached_target:
-            updater.download_target(target_info)
+    trust_updater = TrustUpdater()
+    trust_updater.update()
 
 
 def _sign(args: argparse.Namespace) -> None:
