@@ -17,16 +17,15 @@ import shutil
 import sys
 from importlib import resources
 from pathlib import Path
+from typing import Optional
 
+from tuf.api.metadata import Metadata, Timestamp
 from tuf.ngclient import Updater
 
-TUF_DIR = Path.home() / ".sigstore" / "root"
-METADATA_DIR = TUF_DIR / "metadata"
-TARGETS_DIR = TUF_DIR / "targets"
-EXPECTED_ROOT_DIGEST = (
+PUBLIC_GOOD_URL = "https://storage.googleapis.com/sigstore-tuf-root/"
+EXPECTED_ROOT_DIGEST = (  # corresponds to public good 4.root.json
     "8e34a5c236300b92d0833b205f814d4d7206707fc870d3ff6dcf49f10e56ca0a"
 )
-REPO_URL = "https://storage.googleapis.com/sigstore-tuf-root/"
 # TODO: might it make sense to break these out by requirement
 # (signing vs. verifying)?
 SIGSTORE_TARGETS = [
@@ -42,26 +41,31 @@ SIGSTORE_TARGETS = [
 
 
 class TrustUpdater:
-    # Updater.__init__() does the paving, by calling a separate function (below)
-    #   TUF_DIR -> Path: cache_dir
-    #   REPO_URL -> Optional[str]: repo_url – default is public good url
-    #   EXPECTED_ROOT_DIGEST -> Optional[str]: bootstrap_root_digest – default
-    def __init__(self) -> None:
-        # TODO: parameterise and add params to __init__
-        self.prepare_local_cache()
+    def __init__(self, tuf_dir: Optional[str] = None) -> None:
+        if tuf_dir:
+            _tuf_dir = Path(tuf_dir)
+        else:
+            _tuf_dir = Path.home() / ".sigstore" / "root"
+        # TODO: this should be a param in order to support private and staging
+        # instances of Sigstore
+        self._repo_url = PUBLIC_GOOD_URL
+        self._prepare_local_cache(_tuf_dir)
 
-    # Updater.prepare_local_cache() will create and populate the local directories
-    def prepare_local_cache(self) -> None:
-        """ """
-        tuf_root = METADATA_DIR / "root.json"
+    def _prepare_local_cache(self, tuf_dir: Path) -> None:
+        """
+        Create and populate the local directories used by the TUF client
+        """
+        self._metadata_dir = tuf_dir / "metadata"
+        self._targets_dir = tuf_dir / "targets"
+        tuf_root = self._metadata_dir / "root.json"
         if not tuf_root.exists():
-            TUF_DIR.mkdir(mode=0o0700, parents=True, exist_ok=True)
-            METADATA_DIR.mkdir(mode=0o0700, parents=True, exist_ok=True)
-            TARGETS_DIR.mkdir(mode=0o0700, parents=True, exist_ok=True)
+            tuf_dir.mkdir(mode=0o0700, parents=True, exist_ok=True)
+            self._metadata_dir.mkdir(mode=0o0700, parents=True, exist_ok=True)
+            self._targets_dir.mkdir(mode=0o0700, parents=True, exist_ok=True)
 
             # Ensure the bundled copy of the root json is not tampered with
-            # NOTE: this check requires us to update EXPECTED_ROOT_DIGEST each time
-            # we bundle a newer root.json
+            # NOTE: this check requires us to update EXPECTED_ROOT_DIGEST each
+            # time we bundle a newer root.json
             bootstrap_root = resources.read_binary("sigstore._store", "root.json")
             bootstrap_root_digest = hashlib.sha256(bootstrap_root).hexdigest()
             if not bootstrap_root_digest == EXPECTED_ROOT_DIGEST:
@@ -72,28 +76,35 @@ class TrustUpdater:
                 sys.exit(1)
 
             # Copy the trusted root and existing targets from the store
+            # TODO: we need to be able to take a root.json that wasn't bundled
+            #  with the implementation, i.e. for private sigstore deployments
+            # (this also affects the bootstrap_root digest comparison above)
             with resources.path("sigstore._store", "root.json") as res:
-                shutil.copy2(res, METADATA_DIR)
+                shutil.copy2(res, self._metadata_dir)
             for target in SIGSTORE_TARGETS:
                 with resources.path("sigstore._store", target) as res:
-                    shutil.copy2(res, TARGETS_DIR)
+                    shutil.copy2(res, self._targets_dir)
 
-    # Updater.check_local_cache() will ensure the metadata directory is sane
-    def check_local_cache(self) -> None:
-        """ """
-        # TODO: how?
-        pass
+    def _should_update(self) -> bool:
+        """
+        Should we reach out over the network to update TUF metadata?
+        """
+        return True
 
-    # Updater.update() retrieves new metadata (and all targets? or fetch by usage?)
     def update(self) -> None:
-        """ """
+        """
+        Update the TUF metadata and fetch any updated targets
+        """
+        if not self._should_update():
+            return
+
         updater = Updater(
-            metadata_dir=str(METADATA_DIR),
-            metadata_base_url=f"{REPO_URL}",
-            target_base_url=f"{REPO_URL}/targets/",
-            target_dir=str(TARGETS_DIR),
+            metadata_dir=str(self._metadata_dir),
+            metadata_base_url=f"{self._repo_url}",
+            target_base_url=f"{self._repo_url}/targets/",
+            target_dir=str(self._targets_dir),
         )
-        # TODO: Check whether we should update based on settings and expiration of root
+
         # Fetch the latest version of all of the Sigstore certificates
         updater.refresh()
 
