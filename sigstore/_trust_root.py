@@ -89,7 +89,18 @@ class TrustUpdater:
         """
         Should we reach out over the network to update TUF metadata?
         """
-        return True
+        # if we don't already have a downloaded timestamp metadata, we need
+        # to update
+        timestamp_path = self._metadata_dir / "timestamp.json"
+        if not timestamp_path.exists():
+            return True
+
+        # if timestamp metadata has expired, we need to update
+        timestamp = Metadata[Timestamp].from_file(str(timestamp_path))
+        if timestamp.signed.is_expired():
+            return True
+
+        return False
 
     def update(self) -> None:
         """
