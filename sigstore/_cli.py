@@ -254,7 +254,7 @@ def main() -> None:
     # error handling later.
     args._parser = parser
 
-    _update_trust_root()
+    _update_trust_root(args)
 
     if args.subcommand == "sign":
         _sign(args)
@@ -264,8 +264,10 @@ def main() -> None:
         parser.error(f"Unknown subcommand: {args.subcommand}")
 
 
-def _update_trust_root() -> None:
-    # TODO: this may deserve it's own class to encapsulate all of the constants
+def _update_trust_root(args: argparse.Namespace) -> None:
+    # TODO: MUST handle args.staging here
+    if args.staging:
+        print("WHOOPS! Not yet handling staging instance", file=sys.stderr)
     trust_updater = TrustUpdater()
     trust_updater.update()
 

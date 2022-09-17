@@ -60,6 +60,7 @@ from sigstore._internal.set import InvalidSetError, verify_set
 logger = logging.getLogger(__name__)
 
 
+# TODO: these should all be read from ~/.sigstore
 DEFAULT_FULCIO_ROOT_CERT = resources.read_binary("sigstore._store", "fulcio.crt.pem")
 DEFAULT_FULCIO_INTERMEDIATE_CERT = resources.read_binary(
     "sigstore._store", "fulcio_intermediate.crt.pem"

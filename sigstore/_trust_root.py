@@ -40,6 +40,10 @@ SIGSTORE_TARGETS = [
 ]
 
 
+# TODO: tests!
+# * _prepare_local_cache() against a simple adversary
+# * _should_update() against a simple adversary – what if
+# * update() results in new files (i.e. local copies of TUF metadata)
 class TrustUpdater:
     def __init__(self, tuf_dir: Optional[str] = None) -> None:
         if tuf_dir:
@@ -84,6 +88,7 @@ class TrustUpdater:
             for target in SIGSTORE_TARGETS:
                 with resources.path("sigstore._store", target) as res:
                     shutil.copy2(res, self._targets_dir)
+            # TODO: ensure the directory has appropriate file permissions?
 
     def _should_update(self) -> bool:
         """
@@ -94,7 +99,6 @@ class TrustUpdater:
         timestamp_path = self._metadata_dir / "timestamp.json"
         if not timestamp_path.exists():
             return True
-
         # if timestamp metadata has expired, we need to update
         timestamp = Metadata[Timestamp].from_file(str(timestamp_path))
         if timestamp.signed.is_expired():
@@ -127,3 +131,17 @@ class TrustUpdater:
             cached_target = updater.find_cached_target(target_info)
             if not cached_target:
                 updater.download_target(target_info)
+
+    @classmethod
+    def is_created(tuf_dir: Optional[str] = None) -> bool:
+        """
+        Has the TUF update cycle triggered by `update()` has been run at least
+        once? If it has, we would expect the timestamp metadata to have been
+        retrieved and stored in the cache.
+        """
+        if tuf_dir:
+            _tuf_dir = Path(tuf_dir)
+        else:
+            _tuf_dir = Path.home() / ".sigstore" / "root"
+        timestamp_path = _tuf_dir / "metadata" / "timestamp.json"
+        return timestamp_path.exists()
