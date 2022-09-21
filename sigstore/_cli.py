@@ -16,7 +16,6 @@ import argparse
 import logging
 import os
 import sys
-from importlib import resources
 from pathlib import Path
 from textwrap import dedent
 from typing import TextIO, cast
@@ -35,6 +34,7 @@ from sigstore._internal.oidc.oauth import (
 )
 from sigstore._internal.rekor.client import DEFAULT_REKOR_URL, RekorClient
 from sigstore._sign import Signer
+from sigstore._store import Store
 from sigstore._trust_root import TrustUpdater
 from sigstore._verify import (
     CertificateVerificationFailure,
@@ -56,7 +56,7 @@ class _Embedded:
         self._name = name
 
     def read(self) -> bytes:
-        return resources.read_binary("sigstore._store", self._name)
+        return Store._read_binary(self._name)
 
     def __repr__(self) -> str:
         return f"{self._name} (embedded)"

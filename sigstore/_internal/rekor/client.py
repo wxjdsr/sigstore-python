@@ -21,7 +21,6 @@ from __future__ import annotations
 import json
 from abc import ABC
 from dataclasses import dataclass
-from importlib import resources
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
@@ -29,18 +28,16 @@ import requests
 from cryptography.hazmat.primitives import serialization
 from pydantic import BaseModel, Field, validator
 
+from sigstore._store import Store
+
 DEFAULT_REKOR_URL = "https://rekor.sigstore.dev"
 STAGING_REKOR_URL = "https://rekor.sigstage.dev"
 
-_DEFAULT_REKOR_ROOT_PUBKEY = resources.read_binary("sigstore._store", "rekor.pub")
-_STAGING_REKOR_ROOT_PUBKEY = resources.read_binary(
-    "sigstore._store", "rekor.staging.pub"
-)
+_DEFAULT_REKOR_ROOT_PUBKEY = Store._read_binary("rekor.pub")
+_STAGING_REKOR_ROOT_PUBKEY = Store._read_binary("rekor.staging.pub")
 
-_DEFAULT_REKOR_CTFE_PUBKEY = resources.read_binary("sigstore._store", "ctfe.pub")
-_STAGING_REKOR_CTFE_PUBKEY = resources.read_binary(
-    "sigstore._store", "ctfe.staging.pub"
-)
+_DEFAULT_REKOR_CTFE_PUBKEY = Store._read_binary("ctfe.pub")
+_STAGING_REKOR_CTFE_PUBKEY = Store._read_binary("ctfe.staging.pub")
 
 
 @dataclass(frozen=True)

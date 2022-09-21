@@ -22,7 +22,6 @@ import base64
 import datetime
 import hashlib
 import logging
-from importlib import resources
 from typing import List, Optional, cast
 
 from cryptography.exceptions import InvalidSignature
@@ -56,21 +55,17 @@ from sigstore._internal.rekor import (
     RekorInclusionProof,
 )
 from sigstore._internal.set import InvalidSetError, verify_set
+from sigstore._store import Store
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: these should all be read from ~/.sigstore
-DEFAULT_FULCIO_ROOT_CERT = resources.read_binary("sigstore._store", "fulcio.crt.pem")
-DEFAULT_FULCIO_INTERMEDIATE_CERT = resources.read_binary(
-    "sigstore._store", "fulcio_intermediate.crt.pem"
-)
+DEFAULT_FULCIO_ROOT_CERT = Store._read_binary("fulcio.crt.pem")
+DEFAULT_FULCIO_INTERMEDIATE_CERT = Store._read_binary("fulcio_intermediate.crt.pem")
 
-STAGING_FULCIO_ROOT_CERT = resources.read_binary(
-    "sigstore._store", "fulcio.crt.staging.pem"
-)
-STAGING_FULCIO_INTERMEDIATE_CERT = resources.read_binary(
-    "sigstore._store", "fulcio_intermediate.crt.staging.pem"
+STAGING_FULCIO_ROOT_CERT = Store._read_binary("fulcio.crt.staging.pem")
+STAGING_FULCIO_INTERMEDIATE_CERT = Store._read_binary(
+    "fulcio_intermediate.crt.staging.pem"
 )
 
 # From: https://github.com/sigstore/fulcio/blob/main/docs/oid-info.md
