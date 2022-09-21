@@ -36,3 +36,8 @@
 #   * fulcio.crt.pem
 #   * fulcio_intermediate.crt.pem
 #   * rekor.pub
+from importlib import resources
+
+class Store:
+    def _read_binary(cert_name: str) -> bytes:
+        return resources.read_binary("sigstore._store", cert_name)
