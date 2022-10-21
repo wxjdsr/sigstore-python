@@ -36,8 +36,51 @@
 #   * fulcio.crt.pem
 #   * fulcio_intermediate.crt.pem
 #   * rekor.pub
+
+import shutil
 from importlib import resources
+from pathlib import Path
+from typing import Optional
+
+SIGSTORE_TARGETS = [
+    "ctfe.pub",
+    "ctfe.staging.pub",
+    "fulcio_intermediate.crt.pem",
+    "fulcio_intermediate.crt.staging.pem",
+    "fulcio.crt.pem",
+    "fulcio.crt.staging.pem",
+    "rekor.pub",
+    "rekor.staging.pub",
+]
+
 
 class Store:
-    def _read_binary(cert_name: str) -> bytes:
-        return resources.read_binary("sigstore._store", cert_name)
+    def __init__(self, trust_repo: Optional[str] = None) -> None:
+        # Ensure the store directory exists
+        if trust_repo is None:
+            repo_dir = "root"
+        else:
+            pass  # TODO: implement logic from the design for instances of
+            # sigstore which are not the public good instances
+
+        self._store_dir = Path.home() / ".sigstore" / "root" / repo_dir
+        self._store_dir.mkdir(mode=0o0700, parents=True, exist_ok=True)
+
+        for target in SIGSTORE_TARGETS:
+            target_path = self._store_dir / target
+            if target_path.exists():
+                continue
+
+            with resources.path("sigstore._store", target) as res:
+                # TODO: what about file permissions here?
+                shutil.copy2(res, target_path)
+
+    @classmethod
+    def _read_binary(cls, cert_name: str) -> bytes:
+        # TODO: tests should overwrite HOME so we're not littering the user's
+        # home while testing
+        cert_path = Path.home() / ".sigstore" / "root" / "targets" / cert_name
+        cert_bits = None
+        with open(cert_path, "rb") as cert_file:
+            cert_bits = cert_file.read()
+        return cert_bits
