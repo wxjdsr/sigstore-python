@@ -57,6 +57,7 @@ SIGSTORE_TARGETS = [
 class Store:
     def __init__(self, trust_repo: Optional[str] = None) -> None:
         # Ensure the store directory exists
+        import pdb; pdb.set_trace()
         if trust_repo is None:
             repo_dir = "root"
         else:
@@ -79,6 +80,8 @@ class Store:
     def _read_binary(cls, cert_name: str) -> bytes:
         # TODO: tests should overwrite HOME so we're not littering the user's
         # home while testing
+
+        # TODO: this directory may fail to initialize (unknown reason)
         cert_path = Path.home() / ".sigstore" / "root" / "targets" / cert_name
         cert_bits = None
         with open(cert_path, "rb") as cert_file:
