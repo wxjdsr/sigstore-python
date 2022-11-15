@@ -36,6 +36,7 @@ EXPECTED_ROOT_DIGEST = (  # corresponds to public good 4.root.json
 # * update() results in new files (i.e. local copies of TUF metadata)
 class TrustUpdater:
     def __init__(self, tuf_dir: Optional[str] = None) -> None:
+        # import pdb; pdb.set_trace()
         if tuf_dir:
             _tuf_dir = Path(tuf_dir)
         else:

@@ -266,6 +266,7 @@ def main() -> None:
 
 def _update_trust_root(args: argparse.Namespace) -> None:
     # TODO: MUST handle args.staging here
+    import pdb; pdb.set_trace()
     if args.staging:
         print("WHOOPS! Not yet handling staging instance", file=sys.stderr)
     trust_updater = TrustUpdater()
