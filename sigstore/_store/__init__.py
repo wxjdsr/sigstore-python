@@ -57,7 +57,10 @@ SIGSTORE_TARGETS = [
 class Store:
     def __init__(self, trust_repo: Optional[str] = None) -> None:
         # Ensure the store directory exists
-        import pdb; pdb.set_trace()
+
+        # [WIP] debugging
+        # import pdb; pdb.set_trace()
+
         if trust_repo is None:
             repo_dir = "root"
         else:
@@ -66,6 +69,11 @@ class Store:
 
         self._store_dir = Path.home() / ".sigstore" / "root" / repo_dir
         self._store_dir.mkdir(mode=0o0700, parents=True, exist_ok=True)
+
+        # [Note] From wxjdsr:
+        # A very interesting thing is when I tested on virtual machine like WSL.
+        # Since there is no Path.home() on such machine
+        # The initialization does not succeed
 
         for target in SIGSTORE_TARGETS:
             target_path = self._store_dir / target
@@ -78,10 +86,10 @@ class Store:
 
     @classmethod
     def _read_binary(cls, cert_name: str) -> bytes:
-        # TODO: tests should overwrite HOME so we're not littering the user's
-        # home while testing
+        # [WIP] debugging
+        # import pdb; pdb.set_trace()
 
-        # TODO: this directory may fail to initialize (unknown reason)
+        # TODO: tests should overwrite HOME so we're not littering the user's
         cert_path = Path.home() / ".sigstore" / "root" / "targets" / cert_name
         cert_bits = None
         with open(cert_path, "rb") as cert_file:
