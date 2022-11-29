@@ -24,6 +24,7 @@ from tuf.ngclient import Updater
 
 from sigstore._store import Store, SIGSTORE_TARGETS
 
+
 PUBLIC_GOOD_URL = "https://storage.googleapis.com/sigstore-tuf-root/"
 EXPECTED_ROOT_DIGEST = (  # corresponds to public good 4.root.json
     "8e34a5c236300b92d0833b205f814d4d7206707fc870d3ff6dcf49f10e56ca0a"
@@ -65,6 +66,7 @@ class TrustUpdater:
             # Copy the trusted root and existing targets from the store
             # TODO: we need to be able to take a root.json that wasn't bundled
             #  with the implementation, i.e. for private sigstore deployments
+            
             with resources.path("sigstore._store", "root.json") as res:
                 shutil.copy2(res, self._metadata_dir)
             for target in SIGSTORE_TARGETS:
@@ -114,17 +116,17 @@ class TrustUpdater:
         updater = Updater(
             metadata_dir=str(self._metadata_dir),
             metadata_base_url=f"{self._repo_url}",
-            target_base_url=f"{self._repo_url}/targets/",
+            target_base_url=f"{self._repo_url}targets/",
             target_dir=str(self._targets_dir),
         )
 
         # TODO: TAP 4: multi-repository consensus on entrusted targets
         # https://github.com/theupdateframework/taps/blob/master/tap4.md
-
+        
         # Fetch the latest version of all of the Sigstore certificates
         # FIXME: handle `refresh()` failure.
         updater.refresh()
-
+        
         # Once refresh is done, we have the latest top-level metadata
         # Now, get all targets delegated to by Targets role and all top-level
         # delegations.
@@ -151,6 +153,7 @@ class TrustUpdater:
         # WIP locally scoped function as we'll repeat this logic for
         # top-level Targets and all delegated Targets roles
         def _fetch_all_targets(targets: Dict[str, TargetFile]) -> None:
+
             for target in targets:
                 target_info = updater.get_targetinfo(target)
                 if not target_info:
@@ -163,7 +166,7 @@ class TrustUpdater:
                     updater.download_target(target_info)
 
         # Fetch all targets listed in the top-level Targets metadata
-
+        import pdb; pdb.set_trace()
         _fetch_all_targets(targets_md.signed.targets)
         # I now want to walk delegations and fetch their targets, however
         # python-tuf API is designed to enable the TUF client workflow where
@@ -180,6 +183,7 @@ class TrustUpdater:
             # TODO: verify this PATHPATTERN is correct per glob (7) semantics:
             # https://man7.org/linux/man-pages/man7/glob.7.html
             usage_pattern = f"{usage}/**/*"
+            # [TODO] AttributeError: 'Metadata' object has no attribute 'delegations'
             for (role, _) in targets_md.delegations.get_roles_for_target(usage_pattern):
                 # load the metadata
                 # "fortunately" we're not yet using consistent snapshots, so we do not
