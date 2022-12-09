@@ -25,9 +25,9 @@ from tuf.ngclient import Updater
 from sigstore._store import Store, SIGSTORE_TARGETS
 
 
-PUBLIC_GOOD_URL = "https://storage.googleapis.com/sigstore-tuf-root/"
-EXPECTED_ROOT_DIGEST = (  # corresponds to public good 4.root.json
-    "8e34a5c236300b92d0833b205f814d4d7206707fc870d3ff6dcf49f10e56ca0a"
+PUBLIC_GOOD_URL = "https://sigstore-tuf-root.storage.googleapis.com/"
+EXPECTED_ROOT_DIGEST = (  # corresponds to public good 5.root.json
+    "e2a930b2d1d4053dd56e8faf66fd113658545d522e35d222ccf58fea87ccccf4"
 )
 
 
@@ -37,11 +37,6 @@ EXPECTED_ROOT_DIGEST = (  # corresponds to public good 4.root.json
 # * update() results in new files (i.e. local copies of TUF metadata)
 class TrustUpdater:
     def __init__(self, tuf_dir: Optional[str] = None) -> None:
-        # [WIP] debugging
-        # import pdb; pdb.set_trace()
-        # [TODO] handle with "FileNotFoundError"
-
-        #? [Question] Optional directory sounds good, but how should we use it?
         if tuf_dir:
             _tuf_dir = Path(tuf_dir)
         else:
@@ -53,25 +48,23 @@ class TrustUpdater:
 
     def _prepare_local_cache(self, tuf_dir: Path) -> None:
         """
-        Create and populate the local directories used by the TUF client
+        Initialize metadata directory used by the TUF client
+        (targets directory initialized in Store)
         """
         self._metadata_dir = tuf_dir / "metadata"
         self._targets_dir = tuf_dir / "targets"
         tuf_root = self._metadata_dir / "root.json"
+
         if not tuf_root.exists():
             tuf_dir.mkdir(mode=0o0700, parents=True, exist_ok=True)
             self._metadata_dir.mkdir(mode=0o0700, parents=True, exist_ok=True)
-            self._targets_dir.mkdir(mode=0o0700, parents=True, exist_ok=True)
 
             # Copy the trusted root and existing targets from the store
             # TODO: we need to be able to take a root.json that wasn't bundled
             #  with the implementation, i.e. for private sigstore deployments
-            
+
             with resources.path("sigstore._store", "root.json") as res:
                 shutil.copy2(res, self._metadata_dir)
-            for target in SIGSTORE_TARGETS:
-                with resources.path("sigstore._store", target) as res:
-                    shutil.copy2(res, self._targets_dir)
             # TODO: ensure the directory has appropriate file permissions?
 
         # Ensure the bundled copy of the root json is not tampered with
@@ -79,7 +72,7 @@ class TrustUpdater:
         # time we bundle a newer root.json
         # TODO: what if we're not using the public good instance? A user must be
         # able to supply their own root.json
-        bootstrap_root = Store._read_binary("root.json")
+        bootstrap_root = Store._read_metadata("root.json")
         bootstrap_root_digest = hashlib.sha256(bootstrap_root).hexdigest()
         if not bootstrap_root_digest == EXPECTED_ROOT_DIGEST:
             print(
@@ -90,7 +83,7 @@ class TrustUpdater:
 
     def _should_update(self) -> bool:
         """
-        Should we reach out over the network to update TUF metadata?
+        Check out local timestamp.json to decide to update TUF metadata
         """
         # if we don't already have a downloaded timestamp metadata, we need
         # to update
@@ -166,8 +159,8 @@ class TrustUpdater:
                     updater.download_target(target_info)
 
         # Fetch all targets listed in the top-level Targets metadata
-        import pdb; pdb.set_trace()
         _fetch_all_targets(targets_md.signed.targets)
+
         # I now want to walk delegations and fetch their targets, however
         # python-tuf API is designed to enable the TUF client workflow where
         # it's expected that you know the name of the target you're looking for
@@ -183,7 +176,7 @@ class TrustUpdater:
             # TODO: verify this PATHPATTERN is correct per glob (7) semantics:
             # https://man7.org/linux/man-pages/man7/glob.7.html
             usage_pattern = f"{usage}/**/*"
-            # [TODO] AttributeError: 'Metadata' object has no attribute 'delegations'
+            # FIXME: AttributeError: 'Metadata' object has no attribute 'delegations'
             for (role, _) in targets_md.delegations.get_roles_for_target(usage_pattern):
                 # load the metadata
                 # "fortunately" we're not yet using consistent snapshots, so we do not

@@ -33,11 +33,13 @@ from sigstore._store import Store
 DEFAULT_REKOR_URL = "https://rekor.sigstore.dev"
 STAGING_REKOR_URL = "https://rekor.sigstage.dev"
 
-_DEFAULT_REKOR_ROOT_PUBKEY = Store._read_binary("rekor.pub")
-_STAGING_REKOR_ROOT_PUBKEY = Store._read_binary("rekor.staging.pub")
-
-_DEFAULT_REKOR_CTFE_PUBKEY = Store._read_binary("ctfe.pub")
-_STAGING_REKOR_CTFE_PUBKEY = Store._read_binary("ctfe.staging.pub")
+# FIXME: removed to check if update from network works
+store = Store()
+# _DEFAULT_REKOR_ROOT_PUBKEY = store._read_binary("rekor.pub")
+# _STAGING_REKOR_ROOT_PUBKEY = store._read_binary("rekor.staging.pub")
+# 
+# _DEFAULT_REKOR_CTFE_PUBKEY = store._read_binary("ctfe.pub")
+# _STAGING_REKOR_CTFE_PUBKEY = store._read_binary("ctfe.staging.pub")
 
 
 @dataclass(frozen=True)

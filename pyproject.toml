@@ -107,3 +107,20 @@ plugins = ["pydantic.mypy"]
 
 [tool.bandit]
 exclude_dirs = ["./test"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["sigstore"]
+
+[tool.setuptools.package-data]
+"_store" = ["ctfe.pub",
+    "ctfe.staging.pub",
+    "fulcio_intermediate.crt.pem",
+    "fulcio_intermediate.crt.staging.pem",
+    "fulcio.crt.pem",
+    "fulcio.crt.staging.pem",
+    "rekor.pub",
+    "rekor.staging.pub",
+    "root.json"]

@@ -43,37 +43,31 @@ from pathlib import Path
 from typing import Optional
 
 SIGSTORE_TARGETS = [
-    "ctfe.pub",
-    "ctfe.staging.pub",
-    "fulcio_intermediate.crt.pem",
-    "fulcio_intermediate.crt.staging.pem",
-    "fulcio.crt.pem",
-    "fulcio.crt.staging.pem",
-    "rekor.pub",
-    "rekor.staging.pub",
+   "ctfe.pub",
+   "ctfe.staging.pub",
+   "fulcio_intermediate.crt.pem",
+   "fulcio_intermediate.crt.staging.pem",
+   "fulcio.crt.pem",
+   "fulcio.crt.staging.pem",
+   "rekor.pub",
+   "rekor.staging.pub"
 ]
 
 
 class Store:
     def __init__(self, trust_repo: Optional[str] = None) -> None:
+        '''
+        Initialize targets directory
+        '''
         # Ensure the store directory exists
-
-        # [WIP] debugging
-        # import pdb; pdb.set_trace()
-
         if trust_repo is None:
-            repo_dir = "root"
+            repo_dir = "targets"
         else:
             pass  # TODO: implement logic from the design for instances of
             # sigstore which are not the public good instances
 
-        self._store_dir = Path.home() / ".sigstore" / "root" / repo_dir
+        self._store_dir = Path.home() / ".sigstore" / "root"/ repo_dir
         self._store_dir.mkdir(mode=0o0700, parents=True, exist_ok=True)
-
-        # [Note] From wxjdsr:
-        # A very interesting thing is when I tested on virtual machine like WSL.
-        # Since there is no Path.home() on such machine
-        # The initialization does not succeed
 
         for target in SIGSTORE_TARGETS:
             target_path = self._store_dir / target
@@ -85,13 +79,27 @@ class Store:
                 shutil.copy2(res, target_path)
 
     @classmethod
-    def _read_binary(cls, cert_name: str) -> bytes:
-        # [WIP] debugging
-        # import pdb; pdb.set_trace()
+    def _read_metadata(cls, metadata_name: str) -> bytes:
+        '''
+        read metadata (e.g. root.json) from metadata directory
+        '''
+        metadata_path = Path.home() / ".sigstore" / "root" / "metadata" / metadata_name
+        metadata_bits = None
+        with open(metadata_path, "rb") as metadata_file:
+            metadata_bits = metadata_file.read()
+        return metadata_bits
 
+    @classmethod
+    def _read_binary(cls, cert_name: str) -> bytes:
+        '''
+        read a file from targets directory into bytes
+        '''
         # TODO: tests should overwrite HOME so we're not littering the user's
         cert_path = Path.home() / ".sigstore" / "root" / "targets" / cert_name
         cert_bits = None
         with open(cert_path, "rb") as cert_file:
             cert_bits = cert_file.read()
         return cert_bits
+
+#FIXME: clearly wrong
+# store = Store()
